@@ -1,0 +1,8 @@
+# No external dependencies are required for macOS.
+# The following modules used in the project are part of the Python standard library on macOS:
+# - curses
+# - socket
+# - threading
+# - select
+# - pickle
+# - argparse
