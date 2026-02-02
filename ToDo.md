@@ -5,5 +5,5 @@
 - [ ] Error handling
 - [ ] Make sidebar look good
 - [ ] Allow usernames to be created
-- [ ] Encryption of messages
+- [X] Encryption of messages
 - [ ] File exchange and download

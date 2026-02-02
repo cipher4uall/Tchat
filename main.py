@@ -36,7 +36,9 @@ class Main():
         self.running_server = False
         self.running_client = False
         self.username = "You"
+        self.username = "You"
         self.seperator = ": "
+        self.key = None
     
     def setup_parser(self):
         self.top_parser = ArgumentParser(description="Command line parser", add_help=False, exit_on_error=False)
@@ -47,10 +49,12 @@ class Main():
         server_parser.add_argument('-p', '--port', type=int, help="Port number", default=5050)
         server_parser.add_argument('-i', '--ip', help="IP address", default="localhost")
         server_parser.add_argument('-n', '--name', help="Server name", default="MyServer")
+        server_parser.add_argument('-k', '--key', help="Encryption key (password)", default=None)
 
         connect_parser = subparsers.add_parser('/join', help="Connect to a server")
         connect_parser.add_argument('-p', '--port', type=int, help="Port number", default=5050)
         connect_parser.add_argument('-i', '--ip', help="IP address", default="localhost")
+        connect_parser.add_argument('-k', '--key', help="Encryption key (password)", default=None)
 
 
     def run_gui(self, stdscr):
@@ -87,11 +91,15 @@ class Main():
                 elif user_message.strip() == "":
                     pass
                 else:
+                    final_message = user_message
+                    if self.key:
+                        final_message = tchat_message.encrypt_content(user_message, self.key)
+
                     if self.running_server:
-                        message_object = tchat_message.general_message_encode("[SERVER]", " ", user_message, tchat_message.TEXT_COLOR_BLUE)
+                        message_object = tchat_message.general_message_encode("[SERVER]", " ", final_message, tchat_message.TEXT_COLOR_BLUE)
                         self.server.message_broadcast(message_object)
                     elif self.running_client:
-                        message_object = tchat_message.general_message_encode("_", "_", user_message, tchat_message.TEXT_COLOR_DEFAULT)
+                        message_object = tchat_message.general_message_encode("_", "_", final_message, tchat_message.TEXT_COLOR_DEFAULT)
                         self.client.send_message(message_object)
                     else:
                         self.gui.new_message(self.username, self.seperator, user_message)
@@ -189,7 +197,12 @@ class Main():
             self.gui.console_message_fail(e)
             return
         if tchat_server.is_port_available(args.port):
-            self.server = tchat_server.Server(self.gui, args.ip, args.port, args.name)
+            
+            if args.key:
+                self.key = tchat_message.derive_key(args.key)
+                self.gui.console_message_info(f"Encryption enabled with key.")
+
+            self.server = tchat_server.Server(self.gui, args.ip, args.port, args.name, key=self.key)
             self.process_server = threading.Thread(target=self.server.run_server)
             self.running_server = True
             self.process_server.start()
@@ -204,7 +217,13 @@ class Main():
             self.gui.console_message_fail(f"{e}")
             return
 
-        self.client = tchat_client.Client(self.gui, args.ip, args.port)
+
+
+        if args.key:
+            self.key = tchat_message.derive_key(args.key)
+            self.gui.console_message_info(f"Encryption enabled with key.")
+
+        self.client = tchat_client.Client(self.gui, args.ip, args.port, key=self.key)
         try:
             self.client.start_connection()
         except:

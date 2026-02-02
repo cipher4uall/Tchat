@@ -7,10 +7,11 @@ DATA_SIZE = 1024
 CONNECTION_TIMEOUT = 4
 
 class Client():
-    def __init__(self, gui, server_ip, server_port):
+    def __init__(self, gui, server_ip, server_port, key=None):
         self.gui = gui
         self.server_ip = server_ip
         self.server_port = server_port
+        self.key = key
 
         self.is_running = False
 
@@ -34,7 +35,10 @@ class Client():
                         if object.message_type == tchat_message.MESSAGE_INFO:
                             self.gui.win_draw_sidebar(data)
                         else:
-                            self.gui.new_message(object.sender_name, object.separator, object.message, object.text_color)
+                            display_text = object.message
+                            if self.key:
+                                display_text = tchat_message.decrypt_content(object.message, self.key)
+                            self.gui.new_message(object.sender_name, object.separator, display_text, object.text_color)
 
                 except Exception as e:
                     pass

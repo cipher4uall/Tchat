@@ -28,12 +28,13 @@ class ClientsInfo():
 
 
 class Server():
-    def __init__(self, gui, ip, port, server_name, max_clients=12):
+    def __init__(self, gui, ip, port, server_name, max_clients=12, key=None):
         self.gui = gui
         self.ip_address = ip
         self.server_name = server_name
         self.port = port
         self.max_clients = max_clients
+        self.key = key
         self.username = "[SERVER]"
         self.separator = " "
         self.connected_sockets = []
@@ -66,7 +67,7 @@ class Server():
                     if data:
                         # Yes, this is unintuitive
                         decoded_message = tchat_message.message_decode(data)
-
+                        
                         sender_name = self.sockets_names[connected_socket].username
                         update_data = tchat_message.general_message_encode(sender_name, ": ", decoded_message.message, decoded_message.text_color)
                         self.message_broadcast(update_data)
@@ -76,7 +77,10 @@ class Server():
                         self.message_broadcast(self.create_update_message(), tchat_message.MESSAGE_INFO)
 
     def stop_server(self):
-        object = tchat_message.general_message_encode(tchat_message.CONSOLE_INFO, tchat_message.CONSOLE_SEPERATOR, f"Server has been closed, for clients use /disc to disconnect...", tchat_message.TEXT_COLOR_YELLOW)
+        msg_text = "Server has been closed, for clients use /disc to disconnect..."
+        if self.key:
+            msg_text = tchat_message.encrypt_content(msg_text, self.key)
+        object = tchat_message.general_message_encode(tchat_message.CONSOLE_INFO, tchat_message.CONSOLE_SEPERATOR, msg_text, tchat_message.TEXT_COLOR_YELLOW)
         self.message_broadcast(object)
         self.is_running = False
 
@@ -85,7 +89,12 @@ class Server():
         self.sockets_names[socket] = ClientsInfo(name, None, get_date(), get_time())
         self.new_client_id += 1
         self.connected_sockets.append(socket)
-        object = tchat_message.general_message_encode(tchat_message.CONSOLE_INFO, tchat_message.CONSOLE_SEPERATOR, f"{name} has joined the server...", tchat_message.TEXT_COLOR_YELLOW)
+        
+        msg_text = f"{name} has joined the server..."
+        if self.key:
+            msg_text = tchat_message.encrypt_content(msg_text, self.key)
+
+        object = tchat_message.general_message_encode(tchat_message.CONSOLE_INFO, tchat_message.CONSOLE_SEPERATOR, msg_text, tchat_message.TEXT_COLOR_YELLOW)
         self.message_broadcast(object)
 
 
@@ -94,7 +103,12 @@ class Server():
         name = self.sockets_names[client].username
         del self.sockets_names[client]
         self.connected_sockets.remove(client)
-        object = tchat_message.general_message_encode(tchat_message.CONSOLE_INFO, tchat_message.CONSOLE_SEPERATOR, f"{name} has left the server...", tchat_message.TEXT_COLOR_YELLOW)
+        
+        msg_text = f"{name} has left the server..."
+        if self.key:
+            msg_text = tchat_message.encrypt_content(msg_text, self.key)
+            
+        object = tchat_message.general_message_encode(tchat_message.CONSOLE_INFO, tchat_message.CONSOLE_SEPERATOR, msg_text, tchat_message.TEXT_COLOR_YELLOW)
         self.message_broadcast(object)
 
     def message_broadcast(self, message_object, type=tchat_message.MESSAGE_GENERAL):
@@ -110,7 +124,12 @@ class Server():
             self.gui.win_draw_sidebar(message_object)
         elif type == tchat_message.MESSAGE_GENERAL:
             message = tchat_message.message_decode(message_object)
-            self.gui.new_message(message.sender_name, message.separator, message.message, message.text_color)
+            
+            display_text = message.message
+            if self.key:
+                display_text = tchat_message.decrypt_content(message.message, self.key)
+            
+            self.gui.new_message(message.sender_name, message.separator, display_text, message.text_color)
 
 def is_port_available(port):
     try:
