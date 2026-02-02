@@ -60,10 +60,18 @@ class Main():
 
         while self.running_gui:
             user_input = stdscr.getch()
+            if self.gui.pager_mode:
+                self.gui.handle_pager_input(user_input)
+                continue
+                
             if user_input == curses.KEY_RESIZE:
                 self.gui.handle_resize()
             elif 32 <= user_input <= 126:
                 self.gui.handle_character_input(user_input)
+            elif user_input == curses.KEY_LEFT:
+                self.gui.handle_left()
+            elif user_input == curses.KEY_RIGHT:
+                self.gui.handle_right()
             elif user_input == curses.KEY_UP and not self.gui.shows_first_message:
                 self.gui.chat_scroll_index += 1
                 self.gui.win_draw_semi()
@@ -90,6 +98,8 @@ class Main():
                 
             elif user_input == curses.KEY_BACKSPACE or user_input == 127 or user_input == 8:
                 self.gui.handle_backspace()
+            elif user_input == curses.KEY_DC:
+                self.gui.handle_delete()
 
     def user_command(self, whole_command):
         whole_command = list(whole_command.strip().split(" "))
@@ -130,6 +140,13 @@ class Main():
                 else:
                     self.gui.chatbox_messages.clear()
                     self.gui.win_draw_semi()
+            elif command == "/help":
+                try:
+                    with open("help.md", "r") as f:
+                        text = f.read()
+                        self.gui.enable_pager(text)
+                except Exception as e:
+                    self.gui.console_message_fail(f"Could not load help.md: {e}")
             else:
                 self.gui.console_message_fail("Unknown command...")
 

@@ -12,7 +12,10 @@ class Gui():
         curses.init_pair(tchat_message.TEXT_COLOR_RED, curses.COLOR_RED, -1)
         curses.init_pair(tchat_message.TEXT_COLOR_YELLOW, curses.COLOR_YELLOW, -1)
         curses.init_pair(tchat_message.TEXT_COLOR_BLUE, curses.COLOR_BLUE, -1)
-
+        try:
+            curses.curs_set(0)
+        except:
+            pass
         self.stdscr = stdscr
         self.sidebar_width = 24
         self.user_input_message = ""
@@ -22,6 +25,9 @@ class Gui():
         self.chat_scroll_index = 0
         self.chatbox_messages = []
         self.sidebar_data = None
+        self.pager_mode = False
+        self.pager_lines = []
+        self.pager_scroll_index = 0
 
         self.screen_height = -1
         self.screen_width = -1
@@ -67,7 +73,10 @@ class Gui():
         self.user_input_offset = 0
 
     def win_draw_semi(self):
-        self.win_draw_chatbox()
+        if self.pager_mode:
+            self.win_draw_pager()
+        else:
+            self.win_draw_chatbox()
         self.win_draw_inputfield()
 
 
@@ -107,7 +116,10 @@ class Gui():
 
         try:
             self.stdscr.refresh()
-            self.win_draw_chatbox()
+            if self.pager_mode:
+                self.win_draw_pager()
+            else:
+                self.win_draw_chatbox()
             self.win_draw_sidebar()
             self.win_draw_inputfield()
         except:
@@ -166,6 +178,12 @@ class Gui():
             curses.beep()
         self.inputfield.addstr(0, 0, user_input_display, curses.color_pair(1))
         
+        cursor_screen_x = self.relative_cursor_string_x - self.user_input_offset
+        if 0 <= cursor_screen_x < inputfield_width - 1:
+            try:
+                self.inputfield.insch(0, cursor_screen_x, '.', curses.color_pair(tchat_message.TEXT_COLOR_GREEN))
+            except:
+                pass
         
         self.inputfield_border.addch(1,1, ">")
         self.inputfield_border.refresh()
@@ -221,12 +239,34 @@ class Gui():
             self.user_input_offset = 0
 
     def handle_character_input(self, user_input):
-        self.user_input_message += chr(user_input)
+        part1 = self.user_input_message[:self.relative_cursor_string_x]
+        part2 = self.user_input_message[self.relative_cursor_string_x:]
+        self.user_input_message = part1 + chr(user_input) + part2
+        
         self.update_dimensions()
-        if self.inputfield.getyx()[1] == self.screen_width - 6:
-            self.user_input_offset += 1
-        self.win_draw_inputfield()
+        
         self.relative_cursor_string_x += 1
+        inputfield_width = self.screen_width - 5
+        
+        if self.relative_cursor_string_x >= self.user_input_offset + inputfield_width - 1:
+             self.user_input_offset += 1
+             
+        self.win_draw_inputfield()
+
+    def handle_left(self):
+        if self.relative_cursor_string_x > 0:
+            self.relative_cursor_string_x -= 1
+            if self.relative_cursor_string_x < self.user_input_offset:
+                self.user_input_offset = self.relative_cursor_string_x
+            self.win_draw_inputfield()
+
+    def handle_right(self):
+        if self.relative_cursor_string_x < len(self.user_input_message):
+            self.relative_cursor_string_x += 1
+            inputfield_width = self.screen_width - 5
+            if self.relative_cursor_string_x >= self.user_input_offset + inputfield_width - 1:
+                self.user_input_offset += 1
+            self.win_draw_inputfield()
 
 
     def handle_backspace(self):
@@ -239,8 +279,84 @@ class Gui():
         else:
             curses.beep()
 
+    def handle_delete(self):
+        if self.relative_cursor_string_x < len(self.user_input_message):
+            self.remove_char_in_input()
+            self.win_draw_inputfield()
+        else:
+            curses.beep()
+
     def get_user_input(self):
         return self.user_input_message
 
     def calc_lines_needed(self, text_length, chatbox_width):
         return math.ceil(text_length / chatbox_width)
+
+    def enable_pager(self, text):
+        self.pager_lines = text.split('\n')
+        self.pager_mode = True
+        self.pager_scroll_index = 0
+        self.win_draw_global()
+
+    def disable_pager(self):
+        self.pager_mode = False
+        self.win_draw_global()
+
+    def win_draw_pager(self):
+        self.chatbox.erase()
+        chatbox_height = self.screen_height - 5
+        chatbox_width = self.screen_width - self.sidebar_width  - 3
+
+        display_lines = []
+        for line in self.pager_lines:
+            if not line:
+                display_lines.append("")
+                continue
+            
+            # Simple wrapping for pager
+            while len(line) > chatbox_width:
+                display_lines.append(line[:chatbox_width])
+                line = line[chatbox_width:]
+            display_lines.append(line)
+
+        # Draw visible portion
+        start_index = self.pager_scroll_index
+        end_index = min(len(display_lines), start_index + chatbox_height)
+        
+        for i, line in enumerate(display_lines[start_index:end_index]):
+            try:
+                self.chatbox.addstr(i, 0, line)
+            except:
+                pass
+
+        # Footer hint (optional, or just overlay)
+        try:
+             # self.chatbox.addstr(chatbox_height - 1, 0, "[Press 'q' or 'ESC' to quit]", curses.color_pair(tchat_message.TEXT_COLOR_YELLOW))
+             pass
+        except:
+             pass
+
+        self.chatbox_border.border()
+        self.chatbox_border.refresh()
+        self.chatbox.refresh()
+
+    def handle_pager_input(self, user_input):
+        chatbox_height = self.screen_height - 5
+        
+        # Recalculate total display lines to bound scroll
+        chatbox_width = self.screen_width - self.sidebar_width  - 3
+        display_lines_count = 0
+        for line in self.pager_lines:
+             lines_needed = max(1, math.ceil(len(line) / chatbox_width)) if line else 1
+             display_lines_count += lines_needed
+        
+        if user_input == curses.KEY_UP:
+            if self.pager_scroll_index > 0:
+                self.pager_scroll_index -= 1
+                self.win_draw_pager()
+        elif user_input == curses.KEY_DOWN:
+             if self.pager_scroll_index < display_lines_count - chatbox_height:
+                self.pager_scroll_index += 1
+                self.win_draw_pager()
+        elif user_input == ord('q') or user_input == 27: # q or ESC
+            self.disable_pager()

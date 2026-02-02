@@ -13,6 +13,8 @@ def get_date():
 def get_time():
     datetime.now().strftime("%H:%M")
 
+def get_ip():
+    return socket.gethostbyname(socket.gethostname())
 
 class ClientsInfo():
     def __init__(self, user_id, username, joined_date, joined_time):
@@ -42,7 +44,7 @@ class Server():
         self.server_socket.bind((self.ip_address, self.port))
         self.server_socket.listen(max_clients)
         self.connected_sockets.append(self.server_socket)
-        self.sockets_names[self.server_socket] = ClientsInfo("User#0", self.username, get_date(), get_time())
+        self.sockets_names[self.server_socket] = ClientsInfo("Server Instance", self.username, get_date(), get_time())
         self.is_running = False
 
     def create_update_message(self):
