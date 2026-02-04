@@ -7,3 +7,4 @@
 - [ ] Allow usernames to be created
 - [X] Encryption of messages
 - [ ] File exchange and download
+- [ ] Implement a locally encrypted SQLite database for storing chat sessions and history

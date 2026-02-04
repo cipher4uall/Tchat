@@ -16,6 +16,7 @@ import tchat_gui
 import tchat_server
 import tchat_client
 import tchat_message
+import tchat_database
 
 
 class ArgumentParser(argparse.ArgumentParser):    
@@ -59,6 +60,8 @@ class Main():
         self.username = "You"
         self.seperator = ": "
         self.key = None
+        self.db = tchat_database.ChatDatabase()
+        self.db.log_event("APP_START", "Application started.")
     
     def setup_parser(self):
         """Configures the argument parser for handling commands like /server and /join."""
@@ -88,9 +91,36 @@ class Main():
         self.gui = tchat_gui.Gui(stdscr)
         self.gui.win_draw_global()
         self.running_gui = True
+        
+        # Show restore options on startup
+        sessions = self.db.get_recent_sessions()
+        if sessions:
+            self.gui.show_session_selector(sessions)
 
         while self.running_gui:
             user_input = stdscr.getch()
+            
+            if self.gui.session_select_mode:
+                self.gui.handle_session_select_input(user_input)
+                # Check if selection happened
+                if not self.gui.session_select_mode and self.gui.selected_session_id is not None:
+                     if self.gui.selected_session_id != -1:
+                        # Restore session
+                        # We don't have the key yet if it was encrypted. 
+                        # We will assume user provides key later or we try with None
+                        # (which returns encrypted text if it was encrypted).
+                        # Ideally we ask for key here, but UI limitations.
+                        # We'll just load it. If encrypted, it will look garbled until we decrypt?
+                        # DB load_session_history attempts decrypt if key provided.
+                        # We pass None for now.
+                        msgs = self.db.load_session_history(self.gui.selected_session_id, None)
+                        for sender, content in msgs:
+                            # We can't know color or separator from DB currently (schema limitation in simple design)
+                            # We will use defaults.
+                            self.gui.new_message(sender, ": ", content)
+                        self.gui.console_message_info(f"Restored session #{self.gui.selected_session_id}. Use /join to reconnect.")
+                continue
+
             if self.gui.pager_mode:
                 self.gui.handle_pager_input(user_input)
                 continue
@@ -282,6 +312,12 @@ class Main():
             return
         self.process_client = threading.Thread(target=self.client.run_client)
         self.running_client = True
+        
+        # Start DB session
+        session_id = self.db.start_session(args.name if hasattr(args, 'name') else f"Server-{args.port}", args.ip, args.port)
+        self.client.db = self.db
+        self.client.session_id = session_id
+        
         self.process_client.start()
 
 if __name__ == "__main__":

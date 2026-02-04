@@ -43,6 +43,11 @@ class Gui():
         self.pager_mode = False
         self.pager_lines = []
         self.pager_scroll_index = 0
+        
+        self.session_select_mode = False
+        self.sessions_list = []
+        self.session_select_index = 0
+        self.selected_session_id = None
 
         self.screen_height = -1
         self.screen_width = -1
@@ -151,6 +156,8 @@ class Gui():
             self.stdscr.refresh()
             if self.pager_mode:
                 self.win_draw_pager()
+            elif self.session_select_mode:
+                self.win_draw_session_selector()
             else:
                 self.win_draw_chatbox()
             self.win_draw_sidebar()
@@ -422,3 +429,63 @@ class Gui():
                 self.win_draw_pager()
         elif user_input == ord('q') or user_input == 27: # q or ESC
             self.disable_pager()
+
+    def show_session_selector(self, sessions):
+        """
+        Displays the session selection screen.
+        
+        Args:
+            sessions (list): List of session tuples from the database.
+        """
+        self.sessions_list = sessions
+        self.session_select_mode = True
+        self.session_select_index = 0
+        self.selected_session_id = None
+        self.win_draw_global()
+
+    def win_draw_session_selector(self):
+        """Draws the list of available sessions for restoration."""
+        self.chatbox.erase()
+        
+        self.chatbox.addstr(0, 0, "Select a session to restore (ENTER to select, 'c' to cancel/new session):", curses.color_pair(tchat_message.TEXT_COLOR_YELLOW))
+        
+        visible_height = self.screen_height - 7
+        start_idx = 0
+        if self.session_select_index >= visible_height:
+             start_idx = self.session_select_index - visible_height + 1
+
+        for i, session in enumerate(self.sessions_list[start_idx:start_idx+visible_height]):
+            # session: (id, name, ip, time, end_time) or similar depending on query
+            # Checking get_recent_sessions in database.py: id, server_name, server_ip, start_time
+            display_str = f"[{session[3]}] {session[1]} ({session[2]})"
+            
+            # Simple truncation
+            max_w = self.screen_width - self.sidebar_width - 5
+            if len(display_str) > max_w:
+                display_str = display_str[:max_w-3] + "..."
+
+            if i + start_idx == self.session_select_index:
+                self.chatbox.addstr(i + 2, 0, f"> {display_str}", curses.color_pair(tchat_message.TEXT_COLOR_GREEN))
+            else:
+                self.chatbox.addstr(i + 2, 0, f"  {display_str}")
+                
+        self.chatbox_border.border()
+        self.chatbox_border.refresh()
+        self.chatbox.refresh()
+        
+    def handle_session_select_input(self, user_input):
+        """Handles keyboard input for session selection."""
+        if user_input == curses.KEY_UP:
+            self.session_select_index = max(0, self.session_select_index - 1)
+            self.win_draw_session_selector()
+        elif user_input == curses.KEY_DOWN:
+            self.session_select_index = min(len(self.sessions_list) - 1, self.session_select_index + 1)
+            self.win_draw_session_selector()
+        elif user_input == curses.KEY_ENTER or user_input == 10 or user_input == 13:
+            if self.sessions_list:
+                self.selected_session_id = self.sessions_list[self.session_select_index][0]
+                self.session_select_mode = False # Exit mode
+        elif user_input == ord('c') or user_input == 27:
+            self.session_select_mode = False
+            self.selected_session_id = -1 # Explicit cancel
+
