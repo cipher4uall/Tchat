@@ -97,6 +97,8 @@ class Main():
                 
             if user_input == curses.KEY_RESIZE:
                 self.gui.handle_resize()
+            elif user_input == curses.KEY_F1:
+                self.user_command("/help")
             elif 32 <= user_input <= 126:
                 self.gui.handle_character_input(user_input)
             elif user_input == curses.KEY_LEFT:
