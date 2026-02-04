@@ -1,4 +1,13 @@
+"""
+Message handling module for Tchat.
+
+This module provides:
+- Message classes for different types of communication (General, Info).
+- Serialization and deserialization using pickle.
+- Encryption and decryption utilities using AES-GCM.
+"""
 import pickle
+
 import os
 import base64
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -32,7 +41,13 @@ MESSAGE_INFO = 1
 
 
 class InfoMessage():
+    """
+    Represents a system information message.
+    
+    Used for server updates like client counts and user lists.
+    """
     def __init__(self, server_name, max_clients, connected_clients, clients_info_dict, server_end):
+        """Initializes an InfoMessage with server statistics."""
         self.server_name = server_name
         self.message_type = MESSAGE_INFO
         self.max_clients = max_clients
@@ -42,7 +57,13 @@ class InfoMessage():
 
 
 class GeneralMessage():
+    """
+    Represents a standard chat message.
+    
+    Used for user messages, private messages, and console notifications.
+    """
     def __init__(self, sender_name, separator, message, text_color):
+        """Initializes a GeneralMessage."""
         self.message_type = MESSAGE_GENERAL
         self.sender_name = sender_name
         self.separator = separator
@@ -52,15 +73,19 @@ class GeneralMessage():
 
 
 def general_message_encode(sender_name, separator, message, text_color):
+    """Encodes a GeneralMessage into bytes."""
     return pickle.dumps(GeneralMessage(sender_name, separator, message, text_color))
 
 def info_message_encode(server_name, max_clients, connected_clients, clients_info_dict, server_end):
+    """Encodes an InfoMessage into bytes."""
     return pickle.dumps(InfoMessage(server_name, max_clients, connected_clients, clients_info_dict, server_end))
 
 def message_decode(message_object):
+    """Decodes bytes back into a Message object."""
     return pickle.loads(message_object)
 
 def derive_key(password):
+    """Derives a 32-byte key from a password using PBKDF2HMAC with a salt."""
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
@@ -71,6 +96,16 @@ def derive_key(password):
     return kdf.derive(password.encode())
 
 def encrypt_content(plaintext, key):
+    """
+    Encrypts plaintext using AES-GCM.
+    
+    Args:
+        plaintext (str): The text to encrypt.
+        key (bytes): The encryption key.
+        
+    Returns:
+        str: Base64 encoded string containing nonce + ciphertext.
+    """
     if key is None:
         return plaintext
     
@@ -80,6 +115,16 @@ def encrypt_content(plaintext, key):
     return base64.b64encode(nonce + ciphertext).decode('utf-8')
 
 def decrypt_content(encrypted_text, key):
+    """
+    Decrypts encrypted text using AES-GCM.
+    
+    Args:
+        encrypted_text (str): Base64 encoded string containing nonce + ciphertext.
+        key (bytes): The decryption key.
+        
+    Returns:
+        str: Decrypted plaintext or an error message if decryption fails.
+    """
     if key is None:
         return encrypted_text
     

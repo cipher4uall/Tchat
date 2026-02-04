@@ -1,4 +1,13 @@
+"""
+Main entry point for the Tchat application.
+
+This module handles the initialization of the application, including:
+- Argument parsing for server and client commands.
+- Managing the main event loop for the GUI.
+- coordinating between the GUI, server, and client components.
+"""
 import threading
+
 import curses
 from curses import wrapper
 import argparse
@@ -12,8 +21,12 @@ import tchat_message
 class ArgumentParser(argparse.ArgumentParser):    
     def _get_action_from_name(self, name):
         """Given a name, get the Action instance registered with this parser.
-        If only it were made available in the ArgumentError object. It is 
-        passed as it's first arg...
+        
+        Args:
+            name (str): The name of the action to find.
+            
+        Returns:
+            argparse.Action: The action object if found, otherwise None.
         """
         container = self._actions
         if name is None:
@@ -30,7 +43,14 @@ class ArgumentParser(argparse.ArgumentParser):
         raise message
 
 class Main():
+    """
+    Main application controller.
+    
+    This class manages the lifecycle of the application, handling user input,
+    gui updates, and the state of client/server threads.
+    """
     def __init__(self):
+        """Initialize the Main application, setting up state and parser."""
         self.setup_parser()
         self.running_gui = False
         self.running_server = False
@@ -41,6 +61,7 @@ class Main():
         self.key = None
     
     def setup_parser(self):
+        """Configures the argument parser for handling commands like /server and /join."""
         self.top_parser = ArgumentParser(description="Command line parser", add_help=False, exit_on_error=False)
 
         subparsers = self.top_parser.add_subparsers(dest='command', help="Available commands")
@@ -58,6 +79,12 @@ class Main():
 
 
     def run_gui(self, stdscr):
+        """
+        Main loop for the Curses GUI.
+        
+        Args:
+            stdscr: The curses standard screen object.
+        """
         self.gui = tchat_gui.Gui(stdscr)
         self.gui.win_draw_global()
         self.running_gui = True
@@ -110,6 +137,12 @@ class Main():
                 self.gui.handle_delete()
 
     def user_command(self, whole_command):
+        """
+        Parses and executes user commands entered in the chat.
+        
+        Args:
+            whole_command (str): The full command string including arguments.
+        """
         whole_command = list(whole_command.strip().split(" "))
         command = whole_command[0]
 
@@ -163,6 +196,7 @@ class Main():
             self.gui.console_message_fail(f"Error: {e}")
 
     def quit_client(self):
+        """Stops the client thread and cleans up resources."""
         self.client.stop_client()
         self.running_client = False
         self.process_client.join()
@@ -170,6 +204,7 @@ class Main():
         self.gui.win_draw_sidebar()
 
     def quit_server(self):
+        """Stops the server thread and cleans up resources."""
         self.server.stop_server()
         self.running_server = False
         self.process_server.join()
@@ -177,6 +212,7 @@ class Main():
         self.gui.win_draw_sidebar()
 
     def quit(self):
+        """Exits the application, ensuring client/server threads are stopped."""
         if self.running_server:
             self.quit_server()
         elif self.running_client:
@@ -186,10 +222,17 @@ class Main():
         self.process_gui.join()
 
     def start_gui(self):
+        """Starts the GUI in a separate thread."""
         self.process_gui = threading.Thread(target=wrapper(self.run_gui))
         self.process_gui.start()
 
     def start_server(self, whole_command):
+        """
+        Starts the chat server based on provided arguments.
+        
+        Args:
+            whole_command (list): List of command line arguments for the server.
+        """
         args = None
         try:
             args = self.top_parser.parse_args(whole_command)
@@ -210,6 +253,12 @@ class Main():
             self.gui.console_message_fail(f"Port is reserved or unavailable...")
 
     def start_client(self, whole_command):
+        """
+        Starts the chat client and connects to a server.
+        
+        Args:
+            whole_command (list): List of command line arguments for the client.
+        """
         args = None
         try :
             args = self.top_parser.parse_args(whole_command)

@@ -1,10 +1,25 @@
+"""
+GUI module for the Tchat application using Curses.
+
+This module handles:
+- Drawing the terminal interface (sidebar, chatbox, input field).
+- Handling user keyboard input.
+- Managing window resizing and scrolling.
+"""
 import curses
+
 import tchat_message
 import math
 
 
 class Gui():
+    """
+    Manages the Curses-based Graphical User Interface.
+    
+    This class is responsible for all visual elements and interactions within the terminal window.
+    """
     def __init__(self, stdscr):
+        """Initializes the GUI, sets up colors, and configures windows."""
         curses.use_default_colors()
         curses.start_color()
         curses.init_pair(tchat_message.TEXT_COLOR_DEFAULT, -1, -1)
@@ -39,40 +54,56 @@ class Gui():
         self.chatbox = None
 
     def dimensions_changed(self):
+        """Checks if the terminal dimensions have changed."""
         height, width = self.stdscr.getmaxyx()
         if self.screen_height != height or self.screen_width != width:
             return True
         return False
     
     def update_dimensions(self):
+        """Updates the stored screen height and width."""
         self.screen_height, self.screen_width = self.stdscr.getmaxyx()
 
     def console_message_success(self, message):
+        """Displays a success message in the chatbox."""
         object = tchat_message.GeneralMessage(tchat_message.CONSOLE_SUCCESS, tchat_message.CONSOLE_SEPERATOR, message, tchat_message.TEXT_COLOR_GREEN)
         self.chatbox_messages.append(object)
         self.win_draw_semi()
 
     def console_message_fail(self, message):
+        """Displays a failure message in the chatbox."""
         object = tchat_message.GeneralMessage(tchat_message.CONSOLE_FAIL, tchat_message.CONSOLE_SEPERATOR, message, tchat_message.TEXT_COLOR_RED)
         self.chatbox_messages.append(object)
         self.win_draw_semi()
 
     def console_message_info(self, message):
+        """Displays an informational message in the chatbox."""
         object = tchat_message.GeneralMessage(tchat_message.CONSOLE_INFO, tchat_message.CONSOLE_SEPERATOR, message, tchat_message.TEXT_COLOR_YELLOW)
         self.chatbox_messages.append(object)
         self.win_draw_semi()
 
     def new_message(self, sender_name, seperator, message, color=tchat_message.TEXT_COLOR_DEFAULT):
+        """
+        Adds a new message to the chatbox.
+        
+        Args:
+            sender_name (str): Name of the sender.
+            seperator (str): Separator string between name and message.
+            message (str): The message content.
+            color (int): Color pair index for the message.
+        """
         object = tchat_message.GeneralMessage(sender_name, seperator, message, color)
         self.chatbox_messages.append(object)
         self.win_draw_semi()
 
     def handle_enter(self):
+        """Handles the Enter key press, clearing the input field."""
         self.user_input_message = ""
         self.relative_cursor_string_x = 0
         self.user_input_offset = 0
 
     def win_draw_semi(self):
+        """Partially redraws the window (chatbox and input field only)."""
         if self.pager_mode:
             self.win_draw_pager()
         else:
@@ -81,6 +112,7 @@ class Gui():
 
 
     def update_window_dimensions(self):
+        """Recalculates and recreates window objects based on current screen size."""
         sidebar_height = self.screen_height - 5
         sidebar_width = self.sidebar_width - 4
         inputfield_height = 1
@@ -105,6 +137,7 @@ class Gui():
 
 
     def win_draw_global(self):
+        """Completely reconstructs and redraws the entire interface."""
         self.stdscr.erase()
 
         if self.dimensions_changed():
@@ -127,6 +160,12 @@ class Gui():
 
     # was very tired and lazy when i made this abomination
     def win_draw_sidebar(self, message_object=None):
+        """
+        Draws the sidebar containing server info and user list.
+        
+        Args:
+            message_object: Optional update message containing server stats.
+        """
         def br():
             return 20 * "~"
         
@@ -169,6 +208,7 @@ class Gui():
 
 
     def win_draw_inputfield(self):
+        """Draws the input field and handles text scrolling/cursor position."""
         self.inputfield.erase()
         self.inputfield_border.border()
 
@@ -190,6 +230,7 @@ class Gui():
         self.inputfield.refresh()
 
     def win_draw_chatbox(self):
+        """Draws the chatbox with messages, handling scrolling and word wrapping."""
         self.chatbox.erase()
         chatbox_height = self.screen_height - 5
         chatbox_width = self.screen_width - self.sidebar_width  - 3
@@ -229,6 +270,7 @@ class Gui():
         self.user_input_message = string1 + string2
 
     def handle_resize(self):
+        """Handles terminal resize events."""
         self.win_draw_global()
         inputfield_width = self.screen_width - 5
         if len(self.user_input_message) >= inputfield_width:
@@ -239,6 +281,12 @@ class Gui():
             self.user_input_offset = 0
 
     def handle_character_input(self, user_input):
+        """
+        Processes character input from the user.
+        
+        Args:
+            user_input (int): ASCII value of the pressed key.
+        """
         part1 = self.user_input_message[:self.relative_cursor_string_x]
         part2 = self.user_input_message[self.relative_cursor_string_x:]
         self.user_input_message = part1 + chr(user_input) + part2
@@ -254,6 +302,7 @@ class Gui():
         self.win_draw_inputfield()
 
     def handle_left(self):
+        """Moves cursor left in the input field."""
         if self.relative_cursor_string_x > 0:
             self.relative_cursor_string_x -= 1
             if self.relative_cursor_string_x < self.user_input_offset:
@@ -261,6 +310,7 @@ class Gui():
             self.win_draw_inputfield()
 
     def handle_right(self):
+        """Moves cursor right in the input field."""
         if self.relative_cursor_string_x < len(self.user_input_message):
             self.relative_cursor_string_x += 1
             inputfield_width = self.screen_width - 5
@@ -270,6 +320,7 @@ class Gui():
 
 
     def handle_backspace(self):
+        """Handles backspace key, deleting character before cursor."""
         if self.relative_cursor_string_x != 0:
             if self.user_input_offset > 0:
                 self.user_input_offset -= 1
@@ -280,6 +331,7 @@ class Gui():
             curses.beep()
 
     def handle_delete(self):
+        """Handles delete key, deleting character at cursor."""
         if self.relative_cursor_string_x < len(self.user_input_message):
             self.remove_char_in_input()
             self.win_draw_inputfield()
@@ -287,18 +339,27 @@ class Gui():
             curses.beep()
 
     def get_user_input(self):
+        """Returns the current str in the input field."""
         return self.user_input_message
 
     def calc_lines_needed(self, text_length, chatbox_width):
+        """Calculates how many lines a message will occupy."""
         return math.ceil(text_length / chatbox_width)
 
     def enable_pager(self, text):
+        """
+        Enables pager mode to view long text.
+        
+        Args:
+            text (str): The text content to display.
+        """
         self.pager_lines = text.split('\n')
         self.pager_mode = True
         self.pager_scroll_index = 0
         self.win_draw_global()
 
     def disable_pager(self):
+        """Exits pager mode and returns to chat view."""
         self.pager_mode = False
         self.win_draw_global()
 
@@ -341,6 +402,7 @@ class Gui():
         self.chatbox.refresh()
 
     def handle_pager_input(self, user_input):
+        """Handles input navigation while in pager mode."""
         chatbox_height = self.screen_height - 5
         
         # Recalculate total display lines to bound scroll

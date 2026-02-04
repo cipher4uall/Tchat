@@ -1,4 +1,13 @@
+"""
+Server module for the Tchat application.
+
+This module handles:
+- Server socket creation and management.
+- Client connections and disconnections.
+- Message broadcasting and routing.
+"""
 import socket
+
 import select
 from datetime import datetime
 
@@ -8,15 +17,19 @@ INTERVAL = 0.4
 DATA_SIZE = 1024
 
 def get_date():
+    """Returns the current date in 'DD Mon 'YY' format."""
     datetime.now().strftime("%d %b '\'%y")
 
 def get_time():
+    """Returns the current time in 'HH:MM' format."""
     datetime.now().strftime("%H:%M")
 
 def get_ip():
+    """Returns the IP address of the current machine."""
     return socket.gethostbyname(socket.gethostname())
 
 class ClientsInfo():
+    """Stores information about a connected client."""
     def __init__(self, user_id, username, joined_date, joined_time):
         self.user_id = user_id
         if username:
@@ -28,7 +41,13 @@ class ClientsInfo():
 
 
 class Server():
+    """
+    Tchat Server class.
+    
+    Manages the server socket, client connections, and message broadcasting.
+    """
     def __init__(self, gui, ip, port, server_name, max_clients=12, key=None):
+        """Initializes the server with the given parameters."""
         self.gui = gui
         self.ip_address = ip
         self.server_name = server_name
@@ -49,9 +68,11 @@ class Server():
         self.is_running = False
 
     def create_update_message(self):
+        """Creates a message containing current server status and connected clients."""
         return tchat_message.info_message_encode(self.server_name, self.max_clients, len(self.connected_sockets) - 1, list(self.sockets_names.values()), False)
 
     def run_server(self):
+        """Main server loop handling new connections and incoming messages."""
         self.is_running = True
         self.gui.console_message_success(f"Server is starting on {self.ip_address}:{self.port} with the name: {self.server_name}")
         self.message_broadcast(self.create_update_message(), tchat_message.MESSAGE_INFO)
@@ -77,6 +98,7 @@ class Server():
                         self.message_broadcast(self.create_update_message(), tchat_message.MESSAGE_INFO)
 
     def stop_server(self):
+        """Stops the server and notifies clients."""
         msg_text = "Server has been closed, for clients use /disc to disconnect..."
         if self.key:
             msg_text = tchat_message.encrypt_content(msg_text, self.key)
@@ -85,6 +107,13 @@ class Server():
         self.is_running = False
 
     def new_client(self, socket, address):
+        """
+        Handles a new client connection.
+        
+        Args:
+            socket: The client's socket object.
+            address: The client's address tuple (IP, port).
+        """
         name = "User#" + str(self.new_client_id)
         self.sockets_names[socket] = ClientsInfo(name, None, get_date(), get_time())
         self.new_client_id += 1
@@ -99,6 +128,12 @@ class Server():
 
 
     def remove_client(self, client):
+        """
+        Removes a client from the server and notifies others.
+        
+        Args:
+            client: The client socket to remove.
+        """
         client.close()
         name = self.sockets_names[client].username
         del self.sockets_names[client]
@@ -112,6 +147,13 @@ class Server():
         self.message_broadcast(object)
 
     def message_broadcast(self, message_object, type=tchat_message.MESSAGE_GENERAL):
+        """
+        Broadcasts a message to all connected clients.
+        
+        Args:
+            message_object: The encoded message to send.
+            type (int): The type of message (general or info).
+        """
         for client in self.connected_sockets:
             if client != self.server_socket:
                 try: 
@@ -132,6 +174,15 @@ class Server():
             self.gui.new_message(message.sender_name, message.separator, display_text, message.text_color)
 
 def is_port_available(port):
+    """
+    Checks if a given port is available for binding.
+    
+    Args:
+        port (int): The port number to check.
+        
+    Returns:
+        bool: True if the port is available, False otherwise.
+    """
     try:
         host_ip = socket.gethostbyname(socket.gethostname())
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
